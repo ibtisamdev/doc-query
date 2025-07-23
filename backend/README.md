@@ -73,8 +73,14 @@ FastAPI backend for Doc Query - Document chat with RAG capabilities.
 - `POST /api/documents/upload` - Upload a new document
 - `GET /api/documents/{document_id}` - Get specific document
 - `DELETE /api/documents/{document_id}` - Delete document
-- `POST /api/documents/{document_id}/process` - Process document with text extraction and chunking
+- `POST /api/documents/{document_id}/process` - Process document with text extraction, chunking, and vector indexing
 - `GET /api/documents/{document_id}/chunks` - Get processed chunks for a document
+
+### Vector Search
+
+- `POST /api/documents/search` - Search documents using vector similarity
+- `GET /api/documents/vector-stats` - Get vector database statistics
+- `DELETE /api/documents/{document_id}/vector` - Delete document from vector database
 
 ### Chat
 
@@ -153,6 +159,9 @@ python test_api.py
 # Test document processing
 python test_document_processor.py
 
+# Test vector database functionality
+python test_vector_store.py
+
 # Or test manually with curl
 curl http://localhost:8000/api/health
 ```
@@ -172,9 +181,11 @@ backend/
 ├── config.py                  # Configuration and settings
 ├── database.py                # Database models and connection
 ├── document_processor.py      # Document processing and text chunking
+├── vector_store.py            # ChromaDB vector database integration
 ├── start.py                   # Server startup script
 ├── test_api.py                # API testing script
 ├── test_document_processor.py # Document processing test script
+├── test_vector_store.py       # Vector database test script
 ├── routers/                   # API route modules
 │   ├── health.py              # Health check endpoints
 │   ├── chat.py                # Chat functionality
@@ -214,12 +225,61 @@ if result['success']:
     metadata = result['metadata']
 ```
 
+## Vector Database Integration
+
+The backend includes ChromaDB integration for vector storage and similarity search:
+
+### Features
+
+- **ChromaDB Integration**: Local persistent vector storage
+- **OpenAI Embeddings**: High-quality text embeddings using OpenAI API
+- **Document Indexing**: Automatic indexing of processed documents
+- **Similarity Search**: Vector-based semantic search functionality
+- **Metadata Filtering**: Search with document-specific filters
+
+### Usage
+
+```python
+from vector_store import VectorStore
+
+# Initialize vector store
+vector_store = VectorStore()
+
+# Index a document
+success = vector_store.index_document(
+    document_id=1,
+    chunks=document_chunks,
+    metadata=document_metadata
+)
+
+# Search for similar content
+results = vector_store.search_similar(
+    query="What is machine learning?",
+    n_results=5
+)
+```
+
+### Search API
+
+```bash
+# Search documents
+curl -X POST "http://localhost:8000/api/documents/search" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is artificial intelligence?",
+    "n_results": 5
+  }'
+
+# Get vector database stats
+curl "http://localhost:8000/api/documents/vector-stats"
+```
+
 ## Next Steps
 
-1. **Vector Database Integration**: ChromaDB setup and embedding storage
-2. **LLM Integration**: OpenAI API integration for RAG responses
-3. **Authentication**: User management and session handling
-4. **Enhanced Processing**: OCR for scanned PDFs, table extraction
+1. **LLM Integration**: OpenAI API integration for RAG responses
+2. **Authentication**: User management and session handling
+3. **Enhanced Processing**: OCR for scanned PDFs, table extraction
+4. **Performance Optimization**: Caching and query optimization
 
 ## Troubleshooting
 

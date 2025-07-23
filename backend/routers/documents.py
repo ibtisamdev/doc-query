@@ -9,6 +9,7 @@ import json
 from database import get_db, Document
 from config import settings
 from document_processor import DocumentProcessor
+from vector_store import VectorStore
 
 router = APIRouter()
 
@@ -30,6 +31,17 @@ class DocumentProcessResponse(BaseModel):
     message: str
     chunks_count: Optional[int] = None
     metadata: Optional[dict] = None
+    indexed: Optional[bool] = None
+
+class SearchRequest(BaseModel):
+    query: str
+    n_results: int = 5
+    filter_metadata: Optional[dict] = None
+
+class SearchResponse(BaseModel):
+    results: List[dict]
+    total_results: int
+    query: str
 
 @router.post("/upload")
 async def upload_document(
@@ -143,25 +155,31 @@ async def delete_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    # Delete file from filesystem
     try:
+        # Delete from vector database if indexed
+        if document.is_processed:
+            vector_store = VectorStore()
+            vector_store.delete_document(document_id)
+        
+        # Delete file from filesystem
         if os.path.exists(document.file_path):
             os.remove(document.file_path)
+        
+        # Delete from database
+        db.delete(document)
+        db.commit()
+        
+        return {"message": "Document deleted successfully"}
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
-    
-    # Delete from database
-    db.delete(document)
-    db.commit()
-    
-    return {"message": "Document deleted successfully"}
+        raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")
 
 @router.post("/{document_id}/process", response_model=DocumentProcessResponse)
 async def process_document(
     document_id: int,
     db: Session = Depends(get_db)
 ):
-    """Process a document using the document processor"""
+    """Process a document using the document processor and index in vector database"""
     document = db.query(Document).filter(Document.id == document_id).first()
     
     if not document:
@@ -170,8 +188,9 @@ async def process_document(
     if document.is_processed:
         raise HTTPException(status_code=400, detail="Document already processed")
     
-    # Initialize document processor
+    # Initialize processors
     processor = DocumentProcessor()
+    vector_store = VectorStore()
     
     try:
         # Process the document
@@ -180,22 +199,31 @@ async def process_document(
         if not result['success']:
             raise HTTPException(status_code=500, detail=f"Processing failed: {result['error']}")
         
+        # Index in vector database
+        indexed = vector_store.index_document(
+            document_id=document_id,
+            chunks=result['chunks'],
+            metadata=result['metadata']
+        )
+        
         # Update document with processed data
         document.is_processed = True
         document.content = json.dumps({
             'metadata': result['metadata'],
             'chunks_count': len(result['chunks']),
             'total_chars': result['metadata']['total_chars'],
-            'total_words': result['metadata']['total_words']
+            'total_words': result['metadata']['total_words'],
+            'indexed': indexed
         })
         
         db.commit()
         
         return DocumentProcessResponse(
             success=True,
-            message="Document processed successfully",
+            message="Document processed and indexed successfully" if indexed else "Document processed but indexing failed",
             chunks_count=len(result['chunks']),
-            metadata=result['metadata']
+            metadata=result['metadata'],
+            indexed=indexed
         )
         
     except Exception as e:
@@ -233,4 +261,63 @@ async def get_document_chunks(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to get chunks: {str(e)}")
+
+@router.post("/search", response_model=SearchResponse)
+async def search_documents(
+    request: SearchRequest,
+    db: Session = Depends(get_db)
+):
+    """Search documents using vector similarity"""
+    try:
+        vector_store = VectorStore()
+        
+        # Perform vector search
+        results = vector_store.search_similar(
+            query=request.query,
+            n_results=request.n_results,
+            filter_metadata=request.filter_metadata
+        )
+        
+        return SearchResponse(
+            results=results,
+            total_results=len(results),
+            query=request.query
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@router.get("/vector-stats")
+async def get_vector_stats():
+    """Get vector database statistics"""
+    try:
+        vector_store = VectorStore()
+        stats = vector_store.get_collection_stats()
+        return stats
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+
+@router.delete("/{document_id}/vector")
+async def delete_document_from_vector(
+    document_id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete document from vector database"""
+    document = db.query(Document).filter(Document.id == document_id).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    try:
+        vector_store = VectorStore()
+        success = vector_store.delete_document(document_id)
+        
+        if success:
+            return {"message": f"Document {document_id} deleted from vector database"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to delete from vector database")
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete: {str(e)}") 
