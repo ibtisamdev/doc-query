@@ -15,7 +15,8 @@ FastAPI backend for Doc Query - Document chat with RAG capabilities.
 
 - **Framework**: FastAPI 0.104.1
 - **Database**: SQLite with SQLAlchemy ORM
-- **Document Processing**: PyPDF2, Markdown, BeautifulSoup4
+- **Document Processing**: PyPDF2, Markdown, BeautifulSoup4, html2text
+- **Text Chunking**: LangChain RecursiveCharacterTextSplitter
 - **AI/ML**: OpenAI, LangChain, ChromaDB (for future RAG implementation)
 - **Server**: Uvicorn with hot reload
 
@@ -44,7 +45,7 @@ FastAPI backend for Doc Query - Document chat with RAG capabilities.
 3. **Install dependencies**
 
    ```bash
-   pip install -r ../requirements.txt
+   pip install -r requirements.txt
    ```
 
 4. **Set up environment variables**
@@ -72,7 +73,8 @@ FastAPI backend for Doc Query - Document chat with RAG capabilities.
 - `POST /api/documents/upload` - Upload a new document
 - `GET /api/documents/{document_id}` - Get specific document
 - `DELETE /api/documents/{document_id}` - Delete document
-- `POST /api/documents/{document_id}/process` - Process document
+- `POST /api/documents/{document_id}/process` - Process document with text extraction and chunking
+- `GET /api/documents/{document_id}/chunks` - Get processed chunks for a document
 
 ### Chat
 
@@ -145,8 +147,11 @@ python start.py
 ### Testing the API
 
 ```bash
-# Run the test script
+# Run the API test script
 python test_api.py
+
+# Test document processing
+python test_document_processor.py
 
 # Or test manually with curl
 curl http://localhost:8000/api/health
@@ -163,26 +168,58 @@ Once the server is running, visit:
 
 ```
 backend/
-├── main.py              # FastAPI application entry point
-├── config.py            # Configuration and settings
-├── database.py          # Database models and connection
-├── start.py             # Server startup script
-├── test_api.py          # API testing script
-├── routers/             # API route modules
-│   ├── health.py        # Health check endpoints
-│   ├── chat.py          # Chat functionality
-│   └── documents.py     # Document management
-├── venv/                # Virtual environment
-└── README.md            # This file
+├── main.py                    # FastAPI application entry point
+├── config.py                  # Configuration and settings
+├── database.py                # Database models and connection
+├── document_processor.py      # Document processing and text chunking
+├── start.py                   # Server startup script
+├── test_api.py                # API testing script
+├── test_document_processor.py # Document processing test script
+├── routers/                   # API route modules
+│   ├── health.py              # Health check endpoints
+│   ├── chat.py                # Chat functionality
+│   └── documents.py           # Document management
+├── venv/                      # Virtual environment
+└── README.md                  # This file
+```
+
+## Document Processing
+
+The backend includes a comprehensive document processing system that supports:
+
+### Supported File Types
+
+- **PDF**: Text extraction with page separation
+- **Markdown**: Structured text extraction with formatting preservation
+- **HTML**: Clean text extraction with link handling
+- **Plain Text**: Direct text processing
+
+### Features
+
+- **Text Chunking**: Intelligent text splitting using LangChain
+- **Metadata Extraction**: Document statistics and title extraction
+- **Validation**: File type and size validation
+- **Error Handling**: Comprehensive error handling and fallbacks
+
+### Usage
+
+```python
+from document_processor import DocumentProcessor
+
+processor = DocumentProcessor(chunk_size=1000, chunk_overlap=200)
+result = processor.process_document("document.pdf")
+
+if result['success']:
+    chunks = result['chunks']
+    metadata = result['metadata']
 ```
 
 ## Next Steps
 
-1. **RAG Pipeline Implementation**: Document processing, chunking, and embedding
-2. **Vector Database Integration**: ChromaDB setup and querying
-3. **LLM Integration**: OpenAI API integration for responses
-4. **Authentication**: User management and session handling
-5. **File Processing**: Enhanced document parsing and extraction
+1. **Vector Database Integration**: ChromaDB setup and embedding storage
+2. **LLM Integration**: OpenAI API integration for RAG responses
+3. **Authentication**: User management and session handling
+4. **Enhanced Processing**: OCR for scanned PDFs, table extraction
 
 ## Troubleshooting
 

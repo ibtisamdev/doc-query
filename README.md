@@ -81,7 +81,7 @@ A self-hosted, open-source application that allows teams and individuals to uplo
 3. **Install backend dependencies**
 
    ```bash
-   pip install -r ../requirements.txt
+   pip install -r requirements.txt
    ```
 
 4. **Set up environment variables**

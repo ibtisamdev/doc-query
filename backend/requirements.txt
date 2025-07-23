@@ -11,4 +11,6 @@ langchain==0.0.350
 langchain-openai==0.0.2
 pypdf2==3.0.1
 markdown==3.5.1
-beautifulsoup4==4.12.2 
+beautifulsoup4==4.12.2
+html2text==2020.1.16
+requests==2.32.4 
