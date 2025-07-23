@@ -19,9 +19,13 @@ class Settings(BaseSettings):
     app_name: str = "Doc Query"
     debug: bool = True
     
+    # Frontend URL (for CORS)
+    next_public_app_url: str = "http://localhost:3000"
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # Ignore extra fields in .env file
 
 # Create settings instance
 settings = Settings()

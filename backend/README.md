@@ -82,6 +82,15 @@ FastAPI backend for Doc Query - Document chat with RAG capabilities.
 - `GET /api/documents/vector-stats` - Get vector database statistics
 - `DELETE /api/documents/{document_id}/vector` - Delete document from vector database
 
+### LLM Integration
+
+- `POST /api/llm/query` - Generate RAG response using document context
+- `POST /api/llm/query/stream` - Generate streaming RAG response
+- `POST /api/llm/analyze` - Analyze document (summary or keywords)
+- `GET /api/llm/status` - Test LLM service connection
+- `POST /api/llm/chat/simple` - Simple chat without RAG
+- `GET /api/llm/models` - Get available OpenAI models
+
 ### Chat
 
 - `POST /api/chat/send` - Send a chat message
@@ -162,6 +171,9 @@ python test_document_processor.py
 # Test vector database functionality
 python test_vector_store.py
 
+# Test LLM integration
+python test_llm.py
+
 # Or test manually with curl
 curl http://localhost:8000/api/health
 ```
@@ -182,14 +194,17 @@ backend/
 ├── database.py                # Database models and connection
 ├── document_processor.py      # Document processing and text chunking
 ├── vector_store.py            # ChromaDB vector database integration
+├── llm_service.py             # OpenAI GPT-4 LLM integration
 ├── start.py                   # Server startup script
 ├── test_api.py                # API testing script
 ├── test_document_processor.py # Document processing test script
 ├── test_vector_store.py       # Vector database test script
+├── test_llm.py                # LLM integration test script
 ├── routers/                   # API route modules
 │   ├── health.py              # Health check endpoints
 │   ├── chat.py                # Chat functionality
-│   └── documents.py           # Document management
+│   ├── documents.py           # Document management
+│   └── llm.py                 # LLM integration endpoints
 ├── venv/                      # Virtual environment
 └── README.md                  # This file
 ```
@@ -274,12 +289,77 @@ curl -X POST "http://localhost:8000/api/documents/search" \
 curl "http://localhost:8000/api/documents/vector-stats"
 ```
 
+## LLM Integration
+
+The backend includes comprehensive LLM integration with OpenAI GPT-4 for RAG capabilities:
+
+### Features
+
+- **OpenAI GPT-4 Integration**: Latest GPT-4 Turbo model for high-quality responses
+- **RAG Query Processing**: Retrieval-Augmented Generation with document context
+- **Streaming Responses**: Real-time streaming for better user experience
+- **Document Analysis**: Automatic summarization and keyword extraction
+- **Prompt Engineering**: Optimized prompts for document-specific responses
+- **Error Handling**: Robust error handling and fallback mechanisms
+
+### Usage
+
+```python
+from llm_service import LLMService
+
+# Initialize LLM service
+llm_service = LLMService()
+
+# Generate RAG response
+result = await llm_service.generate_rag_response(
+    query="What is machine learning?",
+    n_context_chunks=5
+)
+
+# Generate streaming response
+async for chunk in llm_service.generate_streaming_rag_response(query):
+    print(chunk['content'])
+
+# Generate document summary
+summary = await llm_service.generate_summary(document_id=1)
+```
+
+### RAG API
+
+```bash
+# Generate RAG response
+curl -X POST "http://localhost:8000/api/llm/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is artificial intelligence?",
+    "n_context_chunks": 5,
+    "temperature": 0.7
+  }'
+
+# Generate streaming response
+curl -X POST "http://localhost:8000/api/llm/query/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Explain machine learning"}'
+
+# Analyze document
+curl -X POST "http://localhost:8000/api/llm/analyze" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "document_id": 1,
+    "analysis_type": "summary",
+    "max_length": 300
+  }'
+
+# Check LLM status
+curl "http://localhost:8000/api/llm/status"
+```
+
 ## Next Steps
 
-1. **LLM Integration**: OpenAI API integration for RAG responses
-2. **Authentication**: User management and session handling
-3. **Enhanced Processing**: OCR for scanned PDFs, table extraction
-4. **Performance Optimization**: Caching and query optimization
+1. **Authentication**: User management and session handling
+2. **Enhanced Processing**: OCR for scanned PDFs, table extraction
+3. **Performance Optimization**: Caching and query optimization
+4. **Advanced Features**: Multi-modal support, conversation memory
 
 ## Troubleshooting
 
