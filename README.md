@@ -27,7 +27,7 @@ A self-hosted, open-source application that allows teams and individuals to uplo
 - npm or yarn
 - Python 3.8+ (for backend)
 
-### Installation
+### Frontend Setup
 
 1. **Clone the repository**
 
@@ -36,7 +36,7 @@ A self-hosted, open-source application that allows teams and individuals to uplo
    cd doc-query
    ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
 
    ```bash
    npm install
@@ -45,7 +45,7 @@ A self-hosted, open-source application that allows teams and individuals to uplo
 3. **Set up environment variables**
 
    ```bash
-   cp .env.example .env.local
+   cp env.example .env.local
    ```
 
    Edit `.env.local` and add your OpenAI API key:
@@ -54,7 +54,7 @@ A self-hosted, open-source application that allows teams and individuals to uplo
    OPENAI_API_KEY=your_api_key_here
    ```
 
-4. **Run the development server**
+4. **Run the frontend development server**
 
    ```bash
    npm run dev
@@ -62,6 +62,46 @@ A self-hosted, open-source application that allows teams and individuals to uplo
 
 5. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Backend Setup
+
+1. **Navigate to backend directory**
+
+   ```bash
+   cd backend
+   ```
+
+2. **Create virtual environment**
+
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install backend dependencies**
+
+   ```bash
+   pip install -r ../requirements.txt
+   ```
+
+4. **Set up environment variables**
+
+   ```bash
+   cp ../env.example .env
+   # Edit .env with your configuration
+   ```
+
+5. **Run the backend server**
+
+   ```bash
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+6. **Test the API**
+
+   ```bash
+   python test_api.py
+   ```
 
 ## Development
 
@@ -84,6 +124,12 @@ doc-query/
 ├── components/            # React components
 │   └── ui/               # shadcn/ui components
 ├── lib/                  # Utility functions
+├── backend/              # FastAPI backend
+│   ├── main.py           # FastAPI application
+│   ├── config.py         # Configuration
+│   ├── database.py       # Database models
+│   ├── routers/          # API routes
+│   └── venv/             # Python virtual environment
 ├── docs/                 # Documentation
 └── public/               # Static assets
 ```
