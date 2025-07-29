@@ -5,7 +5,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, Bot, User, Loader2, RefreshCw } from 'lucide-react'
+import { Send, Bot, User, Loader2, RefreshCw, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { CitationDisplay } from '@/components/citation-display'
+
+interface Citation {
+  id: string
+  document_id: number
+  filename: string
+  content: string
+  page_number?: number
+  chunk_index: number
+  similarity_score: number
+  start_position?: number
+  end_position?: number
+}
 
 interface Message {
   id: string
@@ -13,14 +26,20 @@ interface Message {
   role: 'user' | 'assistant'
   timestamp: Date
   isStreaming?: boolean
+  citations?: Citation[]
+  feedback?: number // 1 for thumbs up, -1 for thumbs down, undefined for no feedback
+  messageId?: number // Backend message ID for feedback submission
 }
 
 interface ChatInterfaceProps {
   onSendMessage: (message: string) => Promise<void>
-  onStreamMessage?: (message: string, onChunk: (chunk: string) => void) => Promise<void>
+  onStreamMessage?: (message: string, onChunk: (chunk: any) => void) => Promise<void>
   messages?: Message[]
   isLoading?: boolean
   onClearChat?: () => void
+  onCitationClick?: (citation: Citation) => void
+  onQuoteCitation?: (citation: Citation) => void
+  onFeedbackSubmit?: (messageId: number, feedback: 'positive' | 'negative') => Promise<void>
 }
 
 export function ChatInterface({
@@ -28,11 +47,15 @@ export function ChatInterface({
   onStreamMessage,
   messages = [],
   isLoading = false,
-  onClearChat
+  onClearChat,
+  onCitationClick,
+  onQuoteCitation,
+  onFeedbackSubmit
 }: ChatInterfaceProps) {
   const [inputValue, setInputValue] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState<string>('')
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState<number | null>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -82,6 +105,19 @@ export function ChatInterface({
     }
   }, [handleSendMessage])
 
+  const handleFeedback = useCallback(async (messageId: number, feedback: 'positive' | 'negative') => {
+    if (!onFeedbackSubmit || feedbackSubmitting === messageId) return
+
+    setFeedbackSubmitting(messageId)
+    try {
+      await onFeedbackSubmit(messageId, feedback)
+    } catch (error) {
+      console.error('Failed to submit feedback:', error)
+    } finally {
+      setFeedbackSubmitting(null)
+    }
+  }, [onFeedbackSubmit, feedbackSubmitting])
+
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
@@ -105,17 +141,54 @@ export function ChatInterface({
           }`}
       >
         <div className="whitespace-pre-wrap break-words">{message.content}</div>
-        <div
-          className={`text-xs mt-1 ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
-            }`}
-        >
-          {formatTime(message.timestamp)}
+        <div className="flex items-center justify-between mt-2">
+          <div
+            className={`text-xs ${message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
+              }`}
+          >
+            {formatTime(message.timestamp)}
+          </div>
+
+          {/* Feedback buttons for assistant messages */}
+          {message.role === 'assistant' && message.messageId && onFeedbackSubmit && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-6 w-6 p-0 ${message.feedback === 1 ? 'text-green-600' : 'text-gray-400'}`}
+                onClick={() => handleFeedback(message.messageId!, 'positive')}
+                disabled={feedbackSubmitting === message.messageId}
+              >
+                <ThumbsUp className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-6 w-6 p-0 ${message.feedback === -1 ? 'text-red-600' : 'text-gray-400'}`}
+                onClick={() => handleFeedback(message.messageId!, 'negative')}
+                disabled={feedbackSubmitting === message.messageId}
+              >
+                <ThumbsDown className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
       {message.role === 'user' && (
         <div className="flex-shrink-0 w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center">
           <User className="w-4 h-4 text-white" />
+        </div>
+      )}
+
+      {/* Citations for assistant messages */}
+      {message.role === 'assistant' && message.citations && message.citations.length > 0 && (
+        <div className="w-full mt-2">
+          <CitationDisplay
+            citations={message.citations}
+            onCitationClick={onCitationClick}
+            onQuoteCitation={onQuoteCitation}
+          />
         </div>
       )}
     </div>

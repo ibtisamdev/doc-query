@@ -213,11 +213,11 @@ class ApiService {
     return this.request('/chat/sessions')
   }
 
-  async getChatMessages(sessionId: number): Promise<ApiResponse<any[]>> {
+  async getChatMessages(sessionId: string): Promise<ApiResponse<any[]>> {
     return this.request(`/chat/sessions/${sessionId}/messages`)
   }
 
-  async sendChatMessage(sessionId: number, message: string): Promise<ApiResponse<any>> {
+  async sendChatMessage(sessionId: string | null, message: string): Promise<ApiResponse<any>> {
     return this.request('/chat/send', {
       method: 'POST',
       body: JSON.stringify({
@@ -227,11 +227,74 @@ class ApiService {
     })
   }
 
+  async sendStreamingChatMessage(
+    sessionId: string | null,
+    message: string,
+    onChunk: (chunk: any) => void
+  ): Promise<void> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/chat/send/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              onChunk(data)
+            } catch (e) {
+              console.warn('Failed to parse SSE data:', line)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Streaming chat failed:', error)
+      throw error
+    }
+  }
+
   async submitFeedback(messageId: number, feedback: 'positive' | 'negative'): Promise<ApiResponse<any>> {
     return this.request(`/chat/messages/${messageId}/feedback`, {
       method: 'POST',
       body: JSON.stringify({ feedback }),
     })
+  }
+
+  // Feedback analytics
+  async getFeedbackStats(): Promise<ApiResponse<any>> {
+    return this.request('/chat/feedback/stats')
+  }
+
+  async getFeedbackTrends(days: number = 30): Promise<ApiResponse<any[]>> {
+    return this.request(`/chat/feedback/trends?days=${days}`)
   }
 }
 

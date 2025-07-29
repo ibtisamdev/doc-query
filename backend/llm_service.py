@@ -78,6 +78,7 @@ User Question: {question}"""
                     'success': False,
                     'response': "I couldn't find any relevant information in your documents to answer this question. Please try rephrasing your query or upload relevant documents.",
                     'context_used': [],
+                    'citations': [],
                     'metadata': {
                         'chunks_retrieved': 0,
                         'total_tokens': 0,
@@ -108,10 +109,14 @@ User Question: {question}"""
             # Extract response content
             response_content = response.choices[0].message.content
             
+            # Prepare citations from context chunks
+            citations = self._prepare_citations(context_chunks)
+            
             return {
                 'success': True,
                 'response': response_content,
                 'context_used': context_chunks,
+                'citations': citations,
                 'metadata': {
                     'chunks_retrieved': len(context_chunks),
                     'total_tokens': response.usage.total_tokens,
@@ -163,7 +168,8 @@ User Question: {question}"""
                 yield {
                     'type': 'error',
                     'content': "I couldn't find any relevant information in your documents to answer this question.",
-                    'metadata': {'chunks_retrieved': 0}
+                    'metadata': {'chunks_retrieved': 0},
+                    'citations': []
                 }
                 return
             
@@ -204,11 +210,15 @@ User Question: {question}"""
                         }
                     }
             
-            # Send final metadata
+            # Prepare citations from context chunks
+            citations = self._prepare_citations(context_chunks)
+            
+            # Send final metadata with citations
             yield {
                 'type': 'complete',
                 'content': full_response,
                 'context_used': context_chunks,
+                'citations': citations,
                 'metadata': {
                     'chunks_retrieved': len(context_chunks),
                     'model_used': self.model,
@@ -253,6 +263,34 @@ Content: {content}
             context_parts.append(chunk_text)
         
         return "\n".join(context_parts)
+    
+    def _prepare_citations(self, context_chunks: List[Dict]) -> List[Dict]:
+        """
+        Prepare citations from context chunks for frontend display
+        
+        Args:
+            context_chunks: List of context chunks with metadata
+            
+        Returns:
+            List of citation objects
+        """
+        citations = []
+        for i, chunk in enumerate(context_chunks):
+            metadata = chunk['metadata']
+            citation = {
+                'id': f"citation_{i}_{chunk.get('id', 'unknown')}",
+                'document_id': metadata.get('document_id'),
+                'filename': metadata.get('filename', 'Unknown'),
+                'content': chunk['content'],
+                'page_number': metadata.get('page_number'),
+                'chunk_index': metadata.get('chunk_index', i),
+                'similarity_score': chunk['similarity_score'],
+                'start_position': metadata.get('start_position'),
+                'end_position': metadata.get('end_position')
+            }
+            citations.append(citation)
+        
+        return citations
     
     async def generate_summary(
         self,
