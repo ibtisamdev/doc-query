@@ -19,14 +19,20 @@ logger = logging.getLogger(__name__)
 class VectorStore:
     """ChromaDB vector store with OpenAI embeddings"""
     
-    def __init__(self, collection_name: str = "documents"):
+    def __init__(self, collection_name: str = "documents", tenant_id: str = None):
         """
         Initialize vector store
         
         Args:
             collection_name: Name of the ChromaDB collection
+            tenant_id: Tenant ID for multi-tenant isolation
         """
-        self.collection_name = collection_name
+        self.tenant_id = tenant_id
+        # Use tenant-specific collection name if tenant_id is provided
+        if tenant_id:
+            self.collection_name = f"{collection_name}_{tenant_id}"
+        else:
+            self.collection_name = collection_name
         self.client = None
         self.collection = None
         
@@ -44,9 +50,17 @@ class VectorStore:
     def _initialize_chromadb(self):
         """Initialize ChromaDB client and collection"""
         try:
+            # Use tenant-specific path if tenant_id is provided
+            if self.tenant_id:
+                tenant_chroma_path = os.path.join(settings.chroma_db_path, self.tenant_id)
+                os.makedirs(tenant_chroma_path, exist_ok=True)
+                chroma_path = tenant_chroma_path
+            else:
+                chroma_path = settings.chroma_db_path
+            
             # Create ChromaDB client with persistent storage
             self.client = chromadb.PersistentClient(
-                path=settings.chroma_db_path,
+                path=chroma_path,
                 settings=Settings(
                     anonymized_telemetry=False,
                     allow_reset=True

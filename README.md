@@ -1,162 +1,190 @@
-# Doc Query
+# Doc Query - Production
 
-A self-hosted, open-source application that allows teams and individuals to upload internal documentation (PDFs, Notion exports, Markdown, HTML) and chat with it using natural language queries. Built using Retrieval-Augmented Generation (RAG), it offers fast, contextual answers with citations.
+A self-hosted, multi-tenant document chat application with RAG capabilities. Upload internal documentation and chat with it using natural language queries with accurate citations.
 
-## Features
+## 🚀 Production Features
 
-- 📄 **Document Upload**: Support for PDFs, Markdown, and HTML files
+- 📄 **Multi-tenant Document Management**: Isolated document storage per tenant
 - 🤖 **RAG-powered Chat**: Natural language queries with accurate, cited answers
 - 🔍 **Vector Search**: Fast semantic search using ChromaDB
 - 📱 **Modern UI**: Built with Next.js 14, TailwindCSS, and shadcn/ui
-- 🚀 **Self-hosted**: Easy deployment with Docker support
-- 🔒 **Privacy-focused**: All data stays on your infrastructure
+- 🔒 **Enterprise Security**: API key authentication, tenant isolation
+- 📊 **Usage Tracking**: Monitor tenant usage and limits
+- 🚀 **Self-hosted**: Complete control over your data
 
-## Tech Stack
+## 🏗️ Architecture
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, TailwindCSS, shadcn/ui
-- **Backend**: FastAPI (Python) or Next.js API routes
-- **Vector Database**: ChromaDB
-- **LLM**: OpenAI GPT-4 (or local models)
-- **Storage**: SQLite for chat history, local filesystem for documents
+- **Frontend**: Next.js 14 (App Router), TypeScript, TailwindCSS
+- **Backend**: FastAPI (Python) with multi-tenant middleware
+- **Vector Database**: ChromaDB for document embeddings
+- **LLM**: OpenAI GPT-4 (configurable)
+- **Storage**: SQLite for metadata, local filesystem for documents
 
-## Getting Started
+## 📦 Production Deployment
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
-- Python 3.8+ (for backend)
+- Python 3.8+
+- OpenAI API key
 
-### Frontend Setup
+### 1. Frontend Deployment
 
-1. **Clone the repository**
+```bash
+# Install dependencies
+npm install
 
-   ```bash
-   git clone https://github.com/yourusername/doc-query.git
-   cd doc-query
-   ```
+# Build for production
+npm run build
 
-2. **Install frontend dependencies**
+# Start production server
+npm start
+```
 
-   ```bash
-   npm install
-   ```
+### 2. Backend Deployment
 
-3. **Set up environment variables**
+```bash
+cd backend
 
-   ```bash
-   cp env.example .env.local
-   ```
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-   Edit `.env.local` and add your OpenAI API key:
+# Install dependencies
+pip install -r requirements.txt
 
-   ```
-   OPENAI_API_KEY=your_api_key_here
-   ```
+# Set up environment
+cp env.example .env
+# Edit .env with your configuration
 
-4. **Run the frontend development server**
+# Start production server
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-   ```bash
-   npm run dev
-   ```
+### 3. Environment Configuration
 
-5. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+Create `.env` file in backend directory:
 
-### Backend Setup
+```env
+# Database
+DATABASE_URL=sqlite:///./doc-query.db
 
-1. **Navigate to backend directory**
+# OpenAI
+OPENAI_API_KEY=your_openai_api_key
 
-   ```bash
-   cd backend
-   ```
+# Vector Database
+CHROMA_DB_PATH=./chroma_db
 
-2. **Create virtual environment**
+# File Storage
+UPLOAD_DIR=./uploads
 
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+# Application
+APP_NAME=Doc Query
+DEBUG=false
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
 
-3. **Install backend dependencies**
+## 🔧 Production Configuration
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Multi-Tenant Setup
 
-4. **Set up environment variables**
-
-   ```bash
-   cp ../env.example .env
-   # Edit .env with your configuration
-   ```
-
-5. **Run the backend server**
+1. **Create First Tenant**:
 
    ```bash
-   python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   curl -X POST http://localhost:8000/api/tenants/ \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "Your Company",
+       "max_documents": 1000,
+       "max_chat_messages": 100000,
+       "max_storage_mb": 10000,
+       "features_enabled": ["basic", "chat", "documents", "analytics"]
+     }'
    ```
 
-6. **Test the API**
+2. **Use API Key**: The response will include an API key for authentication
 
-   ```bash
-   python test_api.py
-   ```
+### Security Considerations
 
-## Development
+- ✅ API key authentication for all endpoints
+- ✅ Tenant data isolation
+- ✅ Rate limiting (configurable per tenant)
+- ✅ File upload validation
+- ✅ SQL injection protection
 
-### Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run type-check` - Run TypeScript type checking
-
-### Project Structure
+## 📁 Production File Structure
 
 ```
 doc-query/
-├── app/                    # Next.js app directory
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Home page
+├── app/                    # Next.js frontend
 ├── components/            # React components
-│   └── ui/               # shadcn/ui components
-├── lib/                  # Utility functions
+├── lib/                  # Utilities
 ├── backend/              # FastAPI backend
-│   ├── main.py           # FastAPI application
+│   ├── main.py           # Application entry point
 │   ├── config.py         # Configuration
 │   ├── database.py       # Database models
-│   ├── routers/          # API routes
-│   └── venv/             # Python virtual environment
-├── docs/                 # Documentation
-└── public/               # Static assets
+│   ├── tenant_middleware.py # Multi-tenant logic
+│   ├── tenant_provisioning.py # Tenant management
+│   ├── routers/          # API endpoints
+│   ├── chroma_db/        # Vector database
+│   ├── uploads/          # Document storage
+│   └── requirements.txt  # Python dependencies
+├── package.json          # Node.js dependencies
+└── README.md            # This file
 ```
 
-## Contributing
+## 🔍 API Endpoints
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Tenant Management
 
-## License
+- `POST /api/tenants/` - Create tenant
+- `GET /api/tenants/` - List tenants
+- `GET /api/tenants/{id}` - Get tenant
+- `PUT /api/tenants/{id}` - Update tenant
+- `DELETE /api/tenants/{id}` - Delete tenant
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+### Document Management
 
-## Roadmap
+- `POST /api/documents/upload` - Upload document
+- `GET /api/documents/` - List documents
+- `DELETE /api/documents/{id}` - Delete document
 
-- [ ] File upload and parsing
-- [ ] Vector database integration
-- [ ] Chat interface with RAG
-- [ ] Citation system
-- [ ] Chat history
-- [ ] User feedback system
-- [ ] Docker deployment
-- [ ] Notion integration (post-MVP)
+### Chat
 
-## Support
+- `POST /api/chat/send` - Send message
+- `GET /api/chat/sessions` - Get chat sessions
 
-If you have any questions or need help, please open an issue on GitHub.
+## 📊 Monitoring
+
+- **Health Check**: `GET /api/health`
+- **Tenant Usage**: `GET /api/tenants/{id}/usage`
+- **Current Usage**: `GET /api/tenants/current/usage`
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+1. **Database Issues**: Ensure SQLite file is writable
+2. **ChromaDB Issues**: Check chroma_db directory permissions
+3. **File Upload Issues**: Verify uploads directory exists and is writable
+4. **API Key Issues**: Ensure Authorization header format: `Bearer sk_...`
+
+### Logs
+
+Check server logs for detailed error information:
+
+```bash
+# Frontend logs
+npm start
+
+# Backend logs
+python -m uvicorn main:app --log-level debug
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
+
+For production support, please check the logs and ensure all environment variables are properly configured.

@@ -51,7 +51,8 @@ User Question: {question}"""
         n_context_chunks: int = 5,
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        tenant_id: Optional[str] = None
     ) -> Dict:
         """
         Generate RAG response using document context
@@ -67,8 +68,14 @@ User Question: {question}"""
             Dictionary with response and metadata
         """
         try:
+            # Use tenant-specific vector store if tenant_id is provided
+            if tenant_id:
+                vector_store = VectorStore(tenant_id=tenant_id)
+            else:
+                vector_store = self.vector_store
+            
             # Retrieve relevant document chunks
-            context_chunks = self.vector_store.search_similar(
+            context_chunks = vector_store.search_similar(
                 query=query,
                 n_results=n_context_chunks
             )
@@ -142,7 +149,8 @@ User Question: {question}"""
         n_context_chunks: int = 5,
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        tenant_id: Optional[str] = None
     ) -> AsyncGenerator[Dict, None]:
         """
         Generate streaming RAG response
@@ -158,8 +166,14 @@ User Question: {question}"""
             Streaming response chunks
         """
         try:
+            # Use tenant-specific vector store if tenant_id is provided
+            if tenant_id:
+                vector_store = VectorStore(tenant_id=tenant_id)
+            else:
+                vector_store = self.vector_store
+            
             # Retrieve relevant document chunks
-            context_chunks = self.vector_store.search_similar(
+            context_chunks = vector_store.search_similar(
                 query=query,
                 n_results=n_context_chunks
             )

@@ -10,6 +10,8 @@ from database import get_db, Document
 from config import settings
 from document_processor import DocumentProcessor
 from vector_store import VectorStore
+from tenant_middleware import get_tenant_id, get_tenant_context, TenantContext
+from tenant_provisioning import TenantProvisioning
 
 router = APIRouter()
 
@@ -46,7 +48,8 @@ class SearchResponse(BaseModel):
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Upload a document file"""
     # Initialize document processor
@@ -62,8 +65,17 @@ async def upload_document(
             detail=f"File type not supported. Allowed types: {', '.join(allowed_types)}"
         )
     
-    # Save file to upload directory
-    file_path = os.path.join(settings.upload_dir, file.filename)
+    # Check tenant limits
+    if not TenantProvisioning.check_tenant_limits(db, tenant_id, "documents", 1):
+        raise HTTPException(
+            status_code=400,
+            detail="Document limit exceeded for this tenant"
+        )
+    
+    # Save file to tenant-specific upload directory
+    tenant_upload_dir = os.path.join(settings.upload_dir, tenant_id)
+    os.makedirs(tenant_upload_dir, exist_ok=True)
+    file_path = os.path.join(tenant_upload_dir, file.filename)
     
     try:
         with open(file_path, "wb") as buffer:
@@ -81,6 +93,7 @@ async def upload_document(
     
     # Create document record in database
     document = Document(
+        tenant_id=tenant_id,
         filename=file.filename,
         file_path=file_path,
         file_type=file_extension[1:],  # Remove the dot
@@ -104,11 +117,12 @@ async def upload_document(
 async def list_documents(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """List all uploaded documents"""
-    documents = db.query(Document).offset(skip).limit(limit).all()
-    total = db.query(Document).count()
+    documents = db.query(Document).filter(Document.tenant_id == tenant_id).offset(skip).limit(limit).all()
+    total = db.query(Document).filter(Document.tenant_id == tenant_id).count()
     
     return DocumentListResponse(
         documents=[
@@ -128,10 +142,11 @@ async def list_documents(
 @router.get("/{document_id}", response_model=DocumentResponse)
 async def get_document(
     document_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Get a specific document by ID"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.tenant_id == tenant_id).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -147,10 +162,11 @@ async def get_document(
 @router.delete("/{document_id}")
 async def delete_document(
     document_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Delete a document"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.tenant_id == tenant_id).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -158,7 +174,7 @@ async def delete_document(
     try:
         # Delete from vector database if indexed
         if document.is_processed:
-            vector_store = VectorStore()
+            vector_store = VectorStore(tenant_id=tenant_id)
             vector_store.delete_document(document_id)
         
         # Delete file from filesystem
@@ -177,10 +193,11 @@ async def delete_document(
 @router.post("/{document_id}/process", response_model=DocumentProcessResponse)
 async def process_document(
     document_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Process a document using the document processor and index in vector database"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.tenant_id == tenant_id).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -190,7 +207,7 @@ async def process_document(
     
     # Initialize processors
     processor = DocumentProcessor()
-    vector_store = VectorStore()
+    vector_store = VectorStore(tenant_id=tenant_id)
     
     try:
         # Process the document
@@ -232,10 +249,11 @@ async def process_document(
 @router.get("/{document_id}/chunks")
 async def get_document_chunks(
     document_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Get processed chunks for a document"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.tenant_id == tenant_id).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
@@ -266,11 +284,12 @@ async def get_document_chunks(
 @router.post("/search", response_model=SearchResponse)
 async def search_documents(
     request: SearchRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Search documents using vector similarity"""
     try:
-        vector_store = VectorStore()
+        vector_store = VectorStore(tenant_id=tenant_id)
         
         # Perform vector search
         results = vector_store.search_similar(
@@ -289,10 +308,12 @@ async def search_documents(
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @router.get("/vector-stats")
-async def get_vector_stats():
+async def get_vector_stats(
+    tenant_id: str = Depends(get_tenant_id)
+):
     """Get vector database statistics"""
     try:
-        vector_store = VectorStore()
+        vector_store = VectorStore(tenant_id=tenant_id)
         stats = vector_store.get_collection_stats()
         return stats
         
@@ -302,16 +323,17 @@ async def get_vector_stats():
 @router.delete("/{document_id}/vector")
 async def delete_document_from_vector(
     document_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    tenant_id: str = Depends(get_tenant_id)
 ):
     """Delete document from vector database"""
-    document = db.query(Document).filter(Document.id == document_id).first()
+    document = db.query(Document).filter(Document.id == document_id, Document.tenant_id == tenant_id).first()
     
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
     try:
-        vector_store = VectorStore()
+        vector_store = VectorStore(tenant_id=tenant_id)
         success = vector_store.delete_document(document_id)
         
         if success:

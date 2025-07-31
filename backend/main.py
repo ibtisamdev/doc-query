@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 from database import engine, Base
-from routers import chat, documents, health, llm
+from routers import chat, documents, health, llm, tenants
 from config import settings
 
 @asynccontextmanager
@@ -36,6 +36,7 @@ app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(llm.router, prefix="/api/llm", tags=["llm"])
+app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
 
 @app.get("/")
 async def root():
